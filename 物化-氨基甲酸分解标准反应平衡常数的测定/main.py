@@ -451,9 +451,31 @@ def main():
         bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8)
     )
 
+    # Plot ln(p) vs T for linear analysis
+    plt.figure(figsize=(10, 7))
+    ln_p_array = np.log(p_array)
+    plt.scatter(temperatures_c, ln_p_array, color='blue', marker='o', label='实验数据 (ln(p))')
+
+    # Perform linear regression on ln(p) vs T
+    params_ln_p, _ = curve_fit(linear_fit, t_array, ln_p_array)
+    a_ln_p, b_ln_p = params_ln_p
+
+    # Plot the fitted line
+    y_smooth_ln_p = linear_fit(x_smooth, a_ln_p, b_ln_p)
+    plt.plot(x_smooth, y_smooth_ln_p, 'r-', label=f'线性拟合: ln(p) = {a_ln_p:.4f}·T + {b_ln_p:.4f}')
+
+    # Annotate with the linear fit equation
+    plt.annotate(
+        f"ln(p) = {a_ln_p:.4f}·T + {b_ln_p:.4f}",
+        xy=(min(temperatures_c) + (max(temperatures_c) - min(temperatures_c)) * 0.5,
+            min(ln_p_array) + (max(ln_p_array) - min(ln_p_array)) * 0.7),
+        xycoords='data',
+        bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8)
+    )
+
     plt.xlabel('温度 (°C)')
-    plt.ylabel('平衡压力 (kPa)')
-    plt.title('氨基甲酸铵分解平衡压力随温度的变化')
+    plt.ylabel('ln(平衡压力) (kPa)')
+    plt.title('ln(平衡压力) 随温度的变化 (线性分析)')
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
