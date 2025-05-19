@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import os
 
 # 基本参数设置
 g = 9.81  # 重力加速度 (m/s^2)
@@ -49,29 +51,30 @@ def process_section_data(Q, p_data, section, A, z):
     return v, v_head, p_head, total_head
 
 
-# 获取用户输入数据
-def get_user_data(group_label):
-    print(f"\n=== 输入 {group_label} 数据 ===")
-    while True:
-        try:
-            Q = float(input(f"请输入流量 (l/h): ")) / 3600 / 1000  # 转换为 m^3/s
-            if Q <= 0:
-                print("流量必须大于0，请重新输入。")
-                continue
-            break
-        except ValueError:
-            print("请输入有效的数字！")
+# 读取CSV文件数据
+def load_data(file_path):
+    if not os.path.exists(file_path):
+        print(f"错误：文件 {file_path} 不存在！")
+        return None
 
-    p_data = []
-    for i in range(15):  # 假设有15个测试点
-        while True:
-            try:
-                p = float(input(f"请输入测试点 {i + 1} 的压强测量值 (mmH2O): "))
-                p_data.append(p)
-                break
-            except ValueError:
-                print("请输入有效的数字！")
-    return Q, p_data
+    try:
+        # 读取CSV文件
+        df = pd.read_csv(file_path)
+        if df.shape[0] != 3 or df.shape[1] != 17:  # 假设3组数据，16列数据+1列组别
+            print("错误：数据格式不符合预期（应有3行数据和17列）！")
+            return None
+
+        # 提取数据
+        data = []
+        for i in range(3):
+            group_label = df.iloc[i, 0]
+            Q = df.iloc[i, 1] / 3600 / 1000  # 流量 l/h 转换为 m^3/s
+            p_data = df.iloc[i, 2:].values.tolist()  # 压强数据
+            data.append((group_label, Q, p_data))
+        return data
+    except Exception as e:
+        print(f"读取文件时发生错误：{e}")
+        return None
 
 
 # 处理数据并输出结果
@@ -154,17 +157,24 @@ def generate_report(Q1, Q2, Q3, loss_Q1, loss_Q2, loss_Q3):
     print(report)
 
 
-# 主程序：获取用户输入并处理数据
+# 主程序：读取文件并处理数据
 def main():
-    # 获取三组数据
-    Q1, p_data_Q1 = get_user_data("第一组")
-    Q2, p_data_Q2 = get_user_data("第二组")
-    Q3, p_data_Q3 = get_user_data("第三组")
+    file_path = input("请输入数据文件路径 (例如: experiment_data.csv): ")
+    data = load_data(file_path)
+
+    if data is None:
+        print("无法加载数据，程序退出。")
+        return
+
+    # 提取三组数据
+    label1, Q1, p_data_Q1 = data[0]
+    label2, Q2, p_data_Q2 = data[1]
+    label3, Q3, p_data_Q3 = data[2]
 
     # 分析数据
-    p_heads_Q1, loss_Q1, raw_data_Q1 = analyze_data(Q1, p_data_Q1, "第一组")
-    p_heads_Q2, loss_Q2, raw_data_Q2 = analyze_data(Q2, p_data_Q2, "第二组")
-    p_heads_Q3, loss_Q3, raw_data_Q3 = analyze_data(Q3, p_data_Q3, "第三组")
+    p_heads_Q1, loss_Q1, raw_data_Q1 = analyze_data(Q1, p_data_Q1, label1)
+    p_heads_Q2, loss_Q2, raw_data_Q2 = analyze_data(Q2, p_data_Q2, label2)
+    p_heads_Q3, loss_Q3, raw_data_Q3 = analyze_data(Q3, p_data_Q3, label3)
 
     # 绘制压强图
     plot_pressure_data(raw_data_Q1, raw_data_Q2, raw_data_Q3, Q1, Q2, Q3)
