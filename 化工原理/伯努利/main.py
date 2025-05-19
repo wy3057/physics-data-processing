@@ -1,7 +1,13 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.font_manager import FontProperties
+from pylab import mpl
+mpl.rcParams["font.sans-serif"] = ["SimHei"]
+# 加载本地中文字体文件（需替换为实际路径）
+
 
 # 基本参数设置
 g = 9.81  # 重力加速度 (m/s^2)
@@ -105,25 +111,36 @@ def analyze_data(Q, p_data, label):
     return [p_head_A, p_head_B, p_head_C, p_head_D], head_loss, p_data
 
 
-# 绘制测量点高度示意图 (图三和图五) - 柱状图
-def plot_height_diagram():
-    # 假设15个测量点的高度 (单位：m)，根据文丘里管结构模拟
-    # 请根据实际实验装置替换以下高度数据
-    heights = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0]
+# 绘制测量点高度示意图 (图三和图五) - 柱状图，6组数据在同一张图中
+def plot_height_diagram(data_groups, Q_values, labels, fig_title="测量点高度示意图"):
     points = np.arange(1, 16)
+    n_groups = len(points)
+    n_datasets = len(data_groups)  # 6组数据
+    bar_width = 0.13  # 柱子宽度
+    colors = ['skyblue', 'lightgreen', 'lightcoral', 'lightpink', 'lightyellow', 'lightgrey']
 
-    plt.figure(figsize=(10, 6))
-    plt.bar(points, heights, color='skyblue', label='测量点高度')
+    plt.figure(figsize=(12, 6))
+
+    # 为每个测量点绘制6组数据的柱子
+    for i in range(n_datasets):
+        # 计算每组柱子的偏移位置
+        offset = (i - n_datasets / 2) * bar_width + bar_width / 2
+        x_positions = points + offset
+        plt.bar(x_positions, data_groups[i], bar_width, label=f"{Q_values[i] * 3600 * 1000:.0f} l/h ({labels[i]})",
+                color=colors[i])
+
     plt.xlabel("测试点标号")
-    plt.ylabel("高度 (m)")
-    plt.title("测量点高度示意图")
+    plt.ylabel("压差计高度 (mmH2O)")
+    plt.title(fig_title)
+    plt.xticks(points, points)
     plt.grid(True, axis='y')
     plt.legend()
+    plt.tight_layout()
     plt.show()
 
 
 # 绘制能量转换位置--压强图 (图四和图六) - 散点图
-def plot_pressure_diagram(data_groups, Q_values, labels):
+def plot_pressure_diagram(data_groups, Q_values, labels, fig_title="能量转换位置--压强图"):
     points = np.arange(1, 16)
     plt.figure(figsize=(10, 6))
     markers = ['o', 's', '^', 'D', 'x', '*']
@@ -132,7 +149,7 @@ def plot_pressure_diagram(data_groups, Q_values, labels):
                     marker=markers[i], s=100)
     plt.xlabel("测试点标号")
     plt.ylabel("压强 (mmH2O)")
-    plt.title("能量转换位置--压强图")
+    plt.title(fig_title)
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -203,21 +220,21 @@ def main():
         head_losses.append(loss)
         raw_data_groups.append(raw_data)
 
-    # 绘制图三：测量点高度示意图 (柱状图)
+    # 绘制图三：测量点高度示意图 (柱状图，6组数据在同一张图中)
     print("\n绘制图三：测量点高度示意图")
-    plot_height_diagram()
+    plot_height_diagram(raw_data_groups, Q_values, labels, fig_title="图三：测量点高度示意图")
 
     # 绘制图四：能量转换位置--压强图 (散点图)
     print("\n绘制图四：能量转换位置--压强图")
-    plot_pressure_diagram(raw_data_groups, Q_values, labels)
+    plot_pressure_diagram(raw_data_groups, Q_values, labels, fig_title="图四：能量转换位置--压强图")
 
-    # 绘制图五：测量点高度示意图 (柱状图)
+    # 绘制图五：测量点高度示意图 (柱状图，6组数据在同一张图中)
     print("\n绘制图五：测量点高度示意图")
-    plot_height_diagram()
+    plot_height_diagram(raw_data_groups, Q_values, labels, fig_title="图五：测量点高度示意图")
 
     # 绘制图六：能量转换位置--压强图 (散点图)
     print("\n绘制图六：能量转换位置--压强图")
-    plot_pressure_diagram(raw_data_groups, Q_values, labels)
+    plot_pressure_diagram(raw_data_groups, Q_values, labels, fig_title="图六：能量转换位置--压强图")
 
     # 生成实验报告
     generate_report(Q_values, head_losses, labels)
