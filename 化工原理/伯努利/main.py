@@ -60,13 +60,13 @@ def load_data(file_path):
     try:
         # 读取CSV文件
         df = pd.read_csv(file_path)
-        if df.shape[0] != 3 or df.shape[1] != 17:  # 假设3组数据，16列数据+1列组别
-            print("错误：数据格式不符合预期（应有3行数据和17列）！")
+        if df.shape[0] != 6 or df.shape[1] != 17:  # 假设6组数据，16列数据+1列组别
+            print("错误：数据格式不符合预期（应有6行数据和17列）！")
             return None
 
         # 提取数据
         data = []
-        for i in range(3):
+        for i in range(6):
             group_label = df.iloc[i, 0]
             Q = df.iloc[i, 1] / 3600 / 1000  # 流量 l/h 转换为 m^3/s
             p_data = df.iloc[i, 2:].values.tolist()  # 压强数据
@@ -105,13 +105,31 @@ def analyze_data(Q, p_data, label):
     return [p_head_A, p_head_B, p_head_C, p_head_D], head_loss, p_data
 
 
-# 绘制图形
-def plot_pressure_data(data_Q1, data_Q2, data_Q3, Q1, Q2, Q3):
+# 绘制测量点高度示意图 (图三和图五) - 柱状图
+def plot_height_diagram():
+    # 假设15个测量点的高度 (单位：m)，根据文丘里管结构模拟
+    # 请根据实际实验装置替换以下高度数据
+    heights = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0]
+    points = np.arange(1, 16)
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(points, heights, color='skyblue', label='测量点高度')
+    plt.xlabel("测试点标号")
+    plt.ylabel("高度 (m)")
+    plt.title("测量点高度示意图")
+    plt.grid(True, axis='y')
+    plt.legend()
+    plt.show()
+
+
+# 绘制能量转换位置--压强图 (图四和图六) - 散点图
+def plot_pressure_diagram(data_groups, Q_values, labels):
     points = np.arange(1, 16)
     plt.figure(figsize=(10, 6))
-    plt.plot(points, data_Q1, label=f"{Q1 * 3600 * 1000:.0f} l/h", marker='o')
-    plt.plot(points, data_Q2, label=f"{Q2 * 3600 * 1000:.0f} l/h", marker='s')
-    plt.plot(points, data_Q3, label=f"{Q3 * 3600 * 1000:.0f} l/h", marker='^')
+    markers = ['o', 's', '^', 'D', 'x', '*']
+    for i in range(6):
+        plt.scatter(points, data_groups[i], label=f"{Q_values[i] * 3600 * 1000:.0f} l/h ({labels[i]})",
+                    marker=markers[i], s=100)
     plt.xlabel("测试点标号")
     plt.ylabel("压强 (mmH2O)")
     plt.title("能量转换位置--压强图")
@@ -121,7 +139,7 @@ def plot_pressure_data(data_Q1, data_Q2, data_Q3, Q1, Q2, Q3):
 
 
 # 生成实验报告
-def generate_report(Q1, Q2, Q3, loss_Q1, loss_Q2, loss_Q3):
+def generate_report(Q_values, losses, labels):
     report = """
 === 能量转换（伯努利方程）实验报告 ===
 
@@ -141,9 +159,11 @@ def generate_report(Q1, Q2, Q3, loss_Q1, loss_Q2, loss_Q3):
 四、实验数据处理：
 1. 流速、静压头、动能头及总水头的计算结果见上文输出。
 2. 压头损失分析：
-   - 流量 {:.0f} l/h: 压头损失 = {:.3f} m
-   - 流量 {:.0f} l/h: 压头损失 = {:.3f} m
-   - 流量 {:.0f} l/h: 压头损失 = {:.3f} m
+"""
+    for i in range(6):
+        report += f"   - 流量 {Q_values[i] * 3600 * 1000:.0f} l/h ({labels[i]}): 压头损失 = {losses[i]:.3f} m\n"
+
+    report += """
 3. 文丘里测量段分析：
    流体经过扩大管段（A到B）时，流速减小，静压头增加；
    流体经过收缩管段（B到C）时，流速增加，静压头减小；
@@ -153,7 +173,7 @@ def generate_report(Q1, Q2, Q3, loss_Q1, loss_Q2, loss_Q3):
 1. 实验验证了伯努利方程的正确性，流体在流动过程中能量形式发生转换，但总能量基本守恒。
 2. 压头损失随着流量的增加而增大，反映了流体阻力与流速的关系。
 3. 通过压强图可以直观观察到静压头在各截面的变化趋势。
-""".format(Q1 * 3600 * 1000, loss_Q1, Q2 * 3600 * 1000, loss_Q2, Q3 * 3600 * 1000, loss_Q3)
+"""
     print(report)
 
 
@@ -166,21 +186,41 @@ def main():
         print("无法加载数据，程序退出。")
         return
 
-    # 提取三组数据
-    label1, Q1, p_data_Q1 = data[0]
-    label2, Q2, p_data_Q2 = data[1]
-    label3, Q3, p_data_Q3 = data[2]
+    # 提取6组数据
+    labels = []
+    Q_values = []
+    p_data_groups = []
+    for label, Q, p_data in data:
+        labels.append(label)
+        Q_values.append(Q)
+        p_data_groups.append(p_data)
 
     # 分析数据
-    p_heads_Q1, loss_Q1, raw_data_Q1 = analyze_data(Q1, p_data_Q1, label1)
-    p_heads_Q2, loss_Q2, raw_data_Q2 = analyze_data(Q2, p_data_Q2, label2)
-    p_heads_Q3, loss_Q3, raw_data_Q3 = analyze_data(Q3, p_data_Q3, label3)
+    head_losses = []
+    raw_data_groups = []
+    for i in range(6):
+        _, loss, raw_data = analyze_data(Q_values[i], p_data_groups[i], labels[i])
+        head_losses.append(loss)
+        raw_data_groups.append(raw_data)
 
-    # 绘制压强图
-    plot_pressure_data(raw_data_Q1, raw_data_Q2, raw_data_Q3, Q1, Q2, Q3)
+    # 绘制图三：测量点高度示意图 (柱状图)
+    print("\n绘制图三：测量点高度示意图")
+    plot_height_diagram()
+
+    # 绘制图四：能量转换位置--压强图 (散点图)
+    print("\n绘制图四：能量转换位置--压强图")
+    plot_pressure_diagram(raw_data_groups, Q_values, labels)
+
+    # 绘制图五：测量点高度示意图 (柱状图)
+    print("\n绘制图五：测量点高度示意图")
+    plot_height_diagram()
+
+    # 绘制图六：能量转换位置--压强图 (散点图)
+    print("\n绘制图六：能量转换位置--压强图")
+    plot_pressure_diagram(raw_data_groups, Q_values, labels)
 
     # 生成实验报告
-    generate_report(Q1, Q2, Q3, loss_Q1, loss_Q2, loss_Q3)
+    generate_report(Q_values, head_losses, labels)
 
 
 # 运行程序
