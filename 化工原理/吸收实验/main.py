@@ -21,6 +21,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
+import matplotlib.pyplot as plt
+
+# 设置中文字体（选择一种你系统有的）
+matplotlib.rcParams['font.sans-serif'] = ['SimHei']  # 黑体
+# 如果上面不行，可以改成：['Microsoft YaHei'] 或 ['SimSun']
+
+# 解决坐标轴负号显示为方块的问题
+matplotlib.rcParams['axes.unicode_minus'] = False
 
 # ===================== 1. 实验装置参数（可按需要修改） =====================
 
