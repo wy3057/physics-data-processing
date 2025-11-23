@@ -3,19 +3,17 @@
 填料吸收塔实验数据自动处理（Excel 表格输入版）
 
 使用前准备：
-1. 同目录下放一个 Excel 文件：experiment_data.xlsx
+1. 同目录下放一个 Excel 文件：experiment_data.xlsx（或你自己输入的路径）
 2. 其中包含三个工作表：
    - dry          ：干塔流体力学
    - wet          ：湿塔流体力学
    - mass_transfer：传质实验数据
 
-表头格式见脚本开头注释。
-运行结果：
-- 终端打印 3 个处理后的数据表
-- 生成图像：
-  - dp_u_curve.png  : 干/湿塔 (ΔP/Z)-u 曲线
-  - Kxa_vs_L.png    : 传质系数 Kxa-L 曲线
-- 如需导出 Excel，可在 main 里打开相应 to_excel 语句。
+注意：
+- dry / wet 表中可以使用你现在的列名：
+    P2_kPa, GasFlow_Nm3_h
+  程序会自动转换为内部使用的：
+    DeltaP_mmH2O, V_m3_h
 """
 
 import numpy as np
@@ -106,7 +104,7 @@ def integral_NOL_numeric(G: float, L: float, Y1: float, Y2: float,
     """
     数值积分计算 NOL:
         NOL = ∫ dX / (X* - X)
-    采用操作线 & 平衡线关系，见之前说明。
+    采用操作线 & 平衡线关系
     """
     X2 = 0.0
     X1 = G * (Y1 - Y2) / L  # 全塔物料衡算
@@ -133,6 +131,41 @@ def integral_NOL_numeric(G: float, L: float, Y1: float, Y2: float,
     return float(NOL)
 
 
+# ========== 2.5 针对你现在 Excel 列名的预处理函数 ==========
+
+def normalize_hydro_df(df: pd.DataFrame, source_name: str) -> pd.DataFrame:
+    """
+    把你表里的列名转换成程序内部需要的列名：
+    - 如果有 P2_kPa，就换算成 DeltaP_mmH2O
+    - 如果有 GasFlow_Nm3_h，就改名/复制成 V_m3_h
+
+    这样就不用手动改表头了。
+    """
+    df = df.copy()
+
+    # 处理体积流量列
+    if 'V_m3_h' not in df.columns:
+        if 'GasFlow_Nm3_h' in df.columns:
+            # 这里只是把 Nm3/h 当作 m3/h 使用（温度压力接近常温常压）
+            df['V_m3_h'] = df['GasFlow_Nm3_h']
+        else:
+            raise KeyError(
+                f"{source_name} 工作表中找不到 'V_m3_h' 或 'GasFlow_Nm3_h' 列，请检查表头。"
+            )
+
+    # 处理压降列
+    if 'DeltaP_mmH2O' not in df.columns:
+        if 'P2_kPa' in df.columns:
+            # 1 kPa ≈ 101.97 mmH2O
+            df['DeltaP_mmH2O'] = df['P2_kPa'] * 101.97
+        else:
+            raise KeyError(
+                f"{source_name} 工作表中找不到 'DeltaP_mmH2O' 或 'P2_kPa' 列，请检查表头。"
+            )
+
+    return df
+
+
 # ===================== 3. 流体力学数据处理 =====================
 
 def process_hydrodynamics(dry_df: pd.DataFrame,
@@ -141,8 +174,8 @@ def process_hydrodynamics(dry_df: pd.DataFrame,
                           D_m: float):
     """
     输入：
-        dry_df: 列 ['DeltaP_mmH2O', 'V_m3_h']
-        wet_df: 列 ['DeltaP_mmH2O', 'V_m3_h', 'L_L_h', 'Phenomenon'(可选)]
+        dry_df: 至少含 'DeltaP_mmH2O', 'V_m3_h'
+        wet_df: 至少含 'DeltaP_mmH2O', 'V_m3_h'
     输出：
         加了 'u_m_s', 'DeltaP_per_Z_mmH2O_per_m' 的新 DataFrame
     """
@@ -303,16 +336,20 @@ def plot_Kxa_vs_L(df: pd.DataFrame,
 # ===================== 5. 主程序：从 Excel 读表格 =====================
 
 def main():
-    excel_file = 'experiment_data.xlsx'
+    excel_file = input("请输入 Excel 文件路径（例如 experiment_data.xlsx）：").strip()
 
     # 读入三个工作表
     dry_df_raw = pd.read_excel(excel_file, sheet_name='dry')
     wet_df_raw = pd.read_excel(excel_file, sheet_name='wet')
     mt_df_raw = pd.read_excel(excel_file, sheet_name='mass_transfer')
 
+    # ==== 针对你实际的列名做预处理 ====
+    dry_df_norm = normalize_hydro_df(dry_df_raw, source_name='dry')
+    wet_df_norm = normalize_hydro_df(wet_df_raw, source_name='wet')
+
     # 流体力学部分
     dry_df, wet_df = process_hydrodynamics(
-        dry_df_raw, wet_df_raw,
+        dry_df_norm, wet_df_norm,
         Z_m=PACKING_HEIGHT_M,
         D_m=COLUMN_DIAMETER_M
     )
